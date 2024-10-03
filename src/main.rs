@@ -75,6 +75,13 @@ async fn test_fetch_holidays_jp_in_year() {
     let response = fetch_holidays_jp_in_year().await.unwrap();
 
     println!("response: {:?}", response);
+    // server host and port: "0.0.0.0:65192"
+    println!(
+        "server host and port: {:?}",
+        server_with_host.host_with_port()
+    );
+    // server host: "http://0.0.0.0:65192"
+    println!("server host: {:?}", server_with_host.url());
 }
 
 fn main() {
