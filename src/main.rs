@@ -59,6 +59,8 @@ fn todo_details(todo: &Todo) -> String {
 #[tokio::main]
 async fn main() {
     if let Some(todo_id) = std::env::args().nth(1) {
+        // NOTE: 異なるドメインのAPIを叩く際には、モックサーバーをドメインごとに立てる必要がある。
+        // https://hoge.com/todos/1も叩きたい場合を考えている
         let base_url = "https://jsonplaceholder.typicode.com/todos/";
         let url = format!("{}{}", base_url, todo_id);
         match fetch_todo_api(&url).await {
@@ -76,6 +78,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_todo_api() {
+        // NOTE:
+        // こういうモック方法ではなく、RSpecかGolangのgockのように、モックを設定できないだろうか
+        // 理想なクレート.new("http://jsonplaceholder.typicode.com")
+        // .get("/todos/1")
+        // .status(200)
+        // .body(r#"{"userId": 1, "id": 1, "title": "delectus aut autem", "completed": false}"#)
+        //
+        // 理想なクレート.new("http://hoge.com")
+        // .get("/todos/1")
+        // .status(200)
+        // .body(r#"{"userId": 100, "id": 100, "title": "Rust mock", "completed": false}"#)
         let mut server = mockito::Server::new_async().await;
         let path = "/todos/1";
         let json_body =
