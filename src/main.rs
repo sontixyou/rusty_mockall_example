@@ -89,6 +89,10 @@ mod tests {
         // .get("/todos/1")
         // .status(200)
         // .body(r#"{"userId": 100, "id": 100, "title": "Rust mock", "completed": false}"#)
+        //
+        // 利点
+        // テストコード内のアサーションでは、引数のurlによって、どのモックを使うかを切り替える必要がなくなる。
+        // 本番環境とテスト環境で同じコードを実行できるようになる。
         let mut server = mockito::Server::new_async().await;
         let path = "/todos/1";
         let json_body =
