@@ -31,59 +31,72 @@ fn test_database_query_calls() {
 //
 // mockitoを使ったHTTPリクエストのモック
 //
-use reqwest::Response;
-use serde_json::json;
 
-#[derive(serde::Deserialize, serde::Serialize)]
-struct ApiResponseBody {
-    timestamp: String,
-    holiday_name: String,
+use reqwest::Error;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct Todo {
+    #[serde(rename = "userId")]
+    user_id: u32,
+    id: u32,
+    title: String,
+    completed: bool,
 }
 
-pub async fn fetch_holidays_jp_in_year() -> Result<Response, reqwest::Error> {
-    let url = "https://holidays-jp.github.io/api/v1/2021/datetime.json";
-    let response: Response = reqwest::get(url).await?;
-    Ok(response)
+async fn fetch_todo_api(url: &str) -> Result<Todo, Error> {
+    let response = reqwest::get(url).await?;
+    response.json::<Todo>().await
 }
 
-#[tokio::test]
-async fn test_fetch_holidays_jp_in_year() {
-    // doc: https://docs.rs/mockito/latest/mockito/struct.ServerOpts.html
-    let opts = mockito::ServerOpts {
-        // NOTE: IPアドレスを指定するのみ
-        // host: "https://holidays-jp.github.io",
-        host: "0.0.0.0",
-        ..Default::default()
-    };
-    let mut server_with_host = mockito::Server::new_with_opts(opts);
-
-    let response_body = ApiResponseBody {
-        timestamp: "2021-01-01".to_string(),
-        holiday_name: "元日".to_string(),
-    };
-
-    let _m = server_with_host
-        .mock("GET", "/api/v1/2021/datetime.json")
-        .with_status(200)
-        .with_header(
-            reqwest::header::CONTENT_TYPE.to_string(),
-            "application/json",
-        )
-        .with_body(json!(response_body).to_string());
-
-    // モックサーバーにリクエストを送信
-    let response = fetch_holidays_jp_in_year().await.unwrap();
-
-    println!("response: {:?}", response);
-    // server host and port: "0.0.0.0:65192"
-    println!(
-        "server host and port: {:?}",
-        server_with_host.host_with_port()
-    );
-    // server host: "http://0.0.0.0:65192"
-    println!("server host: {:?}", server_with_host.url());
+fn todo_details(todo: &Todo) -> String {
+    format!(
+        "Todo:\nUserId: {}\nId: {}\nTitle: {}\nCompleted: {}",
+        todo.user_id, todo.id, todo.title, todo.completed
+    )
 }
 
-fn main() {
-    println!("Hello, world!");
+#[tokio::main]
+async fn main() {
+    if let Some(todo_id) = std::env::args().nth(1) {
+        let base_url = "https://jsonplaceholder.typicode.com/todos/";
+        let url = format!("{}{}", base_url, todo_id);
+        match fetch_todo_api(&url).await {
+            Ok(todo) => println!("{}", todo_details(&todo)),
+            Err(err) => eprintln!("Error: {}", err),
+        }
+    } else {
+        eprintln!("Error: Todo ID not provided");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_fetch_todo_api() {
+        let mut server = mockito::Server::new_async().await;
+        let path = "/todos/1";
+        let json_body =
+            r#"{"userId": 1, "id": 1, "title": "delectus aut autem", "completed": false}"#;
+
+        let mock = server
+            .mock("GET", path)
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(json_body)
+            .create_async()
+            .await;
+
+        let url = server.url() + path;
+        let todo: Todo = fetch_todo_api(&url).await.unwrap();
+
+        assert_eq!(todo.user_id, 1);
+        assert_eq!(todo.id, 1);
+        assert_eq!(todo.title, "delectus aut autem");
+        assert!(!todo.completed);
+
+        mock.assert_async().await;
+    }
 }
