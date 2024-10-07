@@ -54,7 +54,7 @@ async fn main() {
     let todo_id = 1;
     // NOTE:
     // 変数urlの値を変更したときは、テストがコケるべきときにコケてくれない。これを守るためにRustではどう書けば良いのか?
-    // モックサーバーを起動するのが手間だけど、Rustでは基本的な方法？
+    // 毎回モックサーバーを起動するのが手間だけど、Rustでは基本的な方法？
     let url = "https://jsonplaceholder.typicode.com/todos/";
     match run(url, todo_id).await {
         Ok(result) => println!("{:?}", result),
