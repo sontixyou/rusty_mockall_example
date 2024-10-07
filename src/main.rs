@@ -32,6 +32,9 @@ fn test_database_query_calls() {
 // mockitoを使ったHTTPリクエストのモック
 //
 
+// NOTE:
+// PATHの値を変更したときは、テストがコケるべきときにコケてくれない。これを守るためにRustではどう書けば良いのか?
+// モックサーバーを起動するのはRustでは基本的な方法？
 use reqwest::Error;
 use serde::Deserialize;
 
@@ -51,11 +54,7 @@ static PATH: &str = "http://0.0.0.0:1234/todos/";
 
 #[tokio::main]
 async fn main() {
-    let todo_id = std::env::args()
-        .nth(1)
-        .expect("Error: Todo ID not provided")
-        .parse()
-        .expect("Error: Invalid Todo ID");
+    let todo_id = 1;
     match run(PATH, todo_id).await {
         Ok(result) => println!("{:?}", result),
         Err(err) => eprintln!("Error: {}", err),
@@ -68,7 +67,6 @@ async fn run(url: &str, todo_id: u32) -> Result<Todo, String> {
     }
 
     let url = format!("{}{}", url, todo_id);
-    println!("URL: {}", url);
 
     match fetch_todo_api(&url).await {
         Ok(todo) => Ok(todo),
