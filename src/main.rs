@@ -35,7 +35,7 @@ fn test_database_query_calls() {
 use reqwest::Error;
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, PartialEq)]
 struct Todo {
     #[serde(rename = "userId")]
     user_id: u32,
@@ -44,32 +44,45 @@ struct Todo {
     completed: bool,
 }
 
-async fn fetch_todo_api(url: &str) -> Result<Todo, Error> {
-    let response = reqwest::get(url).await?;
-    response.json::<Todo>().await
-}
-
-fn todo_details(todo: &Todo) -> String {
-    format!(
-        "Todo:\nUserId: {}\nId: {}\nTitle: {}\nCompleted: {}",
-        todo.user_id, todo.id, todo.title, todo.completed
-    )
-}
+#[cfg(not(test))]
+static PATH: &str = "https://jsonplaceholder.typicode.com/todos/";
+#[cfg(test)]
+static PATH: &str = "http://0.0.0.0:1234/todos/";
 
 #[tokio::main]
 async fn main() {
-    if let Some(todo_id) = std::env::args().nth(1) {
-        // NOTE: 異なるドメインのAPIを叩く際には、モックサーバーをドメインごとに立てる必要がある。
-        // https://hoge.com/todos/1も叩きたい場合を考えている
-        let base_url = "https://jsonplaceholder.typicode.com/todos/";
-        let url = format!("{}{}", base_url, todo_id);
-        match fetch_todo_api(&url).await {
-            Ok(todo) => println!("{}", todo_details(&todo)),
-            Err(err) => eprintln!("Error: {}", err),
-        }
-    } else {
-        eprintln!("Error: Todo ID not provided");
+    let todo_id = std::env::args()
+        .nth(1)
+        .expect("Error: Todo ID not provided")
+        .parse()
+        .expect("Error: Invalid Todo ID");
+    match run(PATH, todo_id).await {
+        Ok(result) => println!("{:?}", result),
+        Err(err) => eprintln!("Error: {}", err),
     }
+}
+
+async fn run(url: &str, todo_id: u32) -> Result<Todo, String> {
+    if !validate_domain(url) {
+        return Err("Invalid domain".to_string());
+    }
+
+    let url = format!("{}{}", url, todo_id);
+    println!("URL: {}", url);
+
+    match fetch_todo_api(&url).await {
+        Ok(todo) => Ok(todo),
+        Err(err) => Err(format!("Error: {}", err)),
+    }
+}
+
+fn validate_domain(url: &str) -> bool {
+    url == PATH
+}
+
+async fn fetch_todo_api(url: &str) -> Result<Todo, Error> {
+    let response = reqwest::get(url).await?;
+    response.json::<Todo>().await
 }
 
 #[cfg(test)]
@@ -77,29 +90,19 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_fetch_todo_api() {
-        // NOTE:
-        // こういうモック方法ではなく、RSpecかGolangのgockのように、モックを設定できないだろうか
-        // 理想なクレート.new("http://jsonplaceholder.typicode.com")
-        // .get("/todos/1")
-        // .status(200)
-        // .body(r#"{"userId": 1, "id": 1, "title": "delectus aut autem", "completed": false}"#)
-        //
-        // 理想なクレート.new("http://hoge.com")
-        // .get("/todos/1")
-        // .status(200)
-        // .body(r#"{"userId": 100, "id": 100, "title": "Rust mock", "completed": false}"#)
-        //
-        // 利点
-        // テストコード内のアサーションでは、引数のurlによって、どのモックを使うかを切り替える必要がなくなる。
-        // 本番環境とテスト環境で同じコードを実行できるようになる。
-        let mut server = mockito::Server::new_async().await;
-        let path = "/todos/1";
+    async fn test_run() {
+        let opts = mockito::ServerOpts {
+            host: "0.0.0.0",
+            port: 1234,
+            ..Default::default()
+        };
+        let mut server = mockito::Server::new_with_opts(opts);
+        let path = "/todos/";
         let json_body =
             r#"{"userId": 1, "id": 1, "title": "delectus aut autem", "completed": false}"#;
 
         let mock = server
-            .mock("GET", path)
+            .mock("GET", "/todos/1")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(json_body)
@@ -107,12 +110,14 @@ mod tests {
             .await;
 
         let url = server.url() + path;
-        let todo: Todo = fetch_todo_api(&url).await.unwrap();
-
-        assert_eq!(todo.user_id, 1);
-        assert_eq!(todo.id, 1);
-        assert_eq!(todo.title, "delectus aut autem");
-        assert!(!todo.completed);
+        let todo = run(&url, 1).await.unwrap();
+        let expect_todo = Todo {
+            user_id: 1,
+            id: 1,
+            title: "delectus aut autem".to_string(),
+            completed: false,
+        };
+        assert_eq!(todo, expect_todo);
 
         mock.assert_async().await;
     }
