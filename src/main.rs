@@ -34,7 +34,7 @@ fn test_database_query_calls() {
 
 // NOTE:
 // PATHの値を変更したときは、テストがコケるべきときにコケてくれない。これを守るためにRustではどう書けば良いのか?
-// モックサーバーを起動するのはRustでは基本的な方法？
+// モックサーバーを起動するのは手間だけど、Rustでは基本的な方法？
 use reqwest::Error;
 use serde::Deserialize;
 
