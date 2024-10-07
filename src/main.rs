@@ -32,9 +32,6 @@ fn test_database_query_calls() {
 // mockitoを使ったHTTPリクエストのモック
 //
 
-// NOTE:
-// PATHの値を変更したときは、テストがコケるべきときにコケてくれない。これを守るためにRustではどう書けば良いのか?
-// モックサーバーを起動するのは手間だけど、Rustでは基本的な方法？
 use reqwest::Error;
 use serde::Deserialize;
 
@@ -55,7 +52,11 @@ static PATH: &str = "http://0.0.0.0:1234/todos/";
 #[tokio::main]
 async fn main() {
     let todo_id = 1;
-    match run(PATH, todo_id).await {
+    // NOTE:
+    // 変数urlの値を変更したときは、テストがコケるべきときにコケてくれない。これを守るためにRustではどう書けば良いのか?
+    // モックサーバーを起動するのが手間だけど、Rustでは基本的な方法？
+    let url = "https://jsonplaceholder.typicode.com/todos/";
+    match run(url, todo_id).await {
         Ok(result) => println!("{:?}", result),
         Err(err) => eprintln!("Error: {}", err),
     }
@@ -95,7 +96,6 @@ mod tests {
             ..Default::default()
         };
         let mut server = mockito::Server::new_with_opts(opts);
-        let path = "/todos/";
         let json_body =
             r#"{"userId": 1, "id": 1, "title": "delectus aut autem", "completed": false}"#;
 
@@ -107,7 +107,7 @@ mod tests {
             .create_async()
             .await;
 
-        let url = server.url() + path;
+        let url = server.url() + "/todos/";
         let todo = run(&url, 1).await.unwrap();
         let expect_todo = Todo {
             user_id: 1,
